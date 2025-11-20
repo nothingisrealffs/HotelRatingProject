@@ -1,132 +1,215 @@
-using System;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using HotelRatingViewer.Services;
+using HotelRatingViewer.ViewModels;
 
 namespace HotelRatingViewer.Views.Controls
 {
     public class AdminControl : UserControl
     {
-        private readonly DatabaseService _dbService;
-        private readonly Action<string, string> _updateStatus;
+        private readonly AdminViewModel _viewModel;
 
-        private TextBox _newFeatureNameBox = null!;
-        private TextBox _newSeedPhraseBox = null!;
-        private ComboBox _seedFeatureComboBox = null!;
-        private ComboBox _seedWeightComboBox = null!;
-        private Button _addFeatureButton = null!;
-        private Button _addSeedButton = null!;
-
-        public AdminControl(DatabaseService dbService, Action<string, string> updateStatus)
+        public AdminControl(AdminViewModel viewModel)
         {
-            _dbService = dbService;
-            _updateStatus = updateStatus;
+            _viewModel = viewModel;
+            DataContext = _viewModel;
             BuildUI();
-            LoadFeatures();
         }
 
         private void BuildUI()
         {
+            // Dark mode colors
+            var darkBackground = new SolidColorBrush(Color.Parse("#1E1E1E"));
+            var cardBackground = new SolidColorBrush(Color.Parse("#2D2D30"));
+            var cardBorder = new SolidColorBrush(Color.Parse("#3F3F46"));
+            var textColor = new SolidColorBrush(Color.Parse("#E0E0E0"));
+            var warningBackground = new SolidColorBrush(Color.Parse("#3A3A1F"));
+            var warningBorder = new SolidColorBrush(Color.Parse("#FFC107"));
+
             var adminLabel = new TextBlock
             {
-                Text = "Admin Functions (Bonus Features)",
-                FontSize = 16,
+                Text = "🔐 Admin Functions (Bonus Features)",
+                FontSize = 20,
                 FontWeight = FontWeight.Bold,
-                Margin = new Thickness(10)
+                Margin = new Thickness(10, 10, 10, 5),
+                Foreground = textColor
             };
 
-            var warningText = new TextBlock
+            var warningBanner = new Border
             {
-                Text = "⚠️ Admin privileges required",
-                Foreground = Brushes.OrangeRed,
-                Margin = new Thickness(10, 0, 10, 10)
+                Background = warningBackground,
+                BorderBrush = warningBorder,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(15),
+                Margin = new Thickness(10),
+                Child = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Children =
+                    {
+                        new TextBlock 
+                        { 
+                            Text = "⚠️", 
+                            FontSize = 24,
+                            Margin = new Thickness(0, 0, 10, 0),
+                            VerticalAlignment = VerticalAlignment.Center
+                        },
+                        new TextBlock
+                        {
+                            Text = "Admin privileges required. Changes affect the database directly.",
+                            TextWrapping = TextWrapping.Wrap,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Foreground = new SolidColorBrush(Color.Parse("#FFC107"))
+                        }
+                    }
+                }
             };
 
-            _newFeatureNameBox = new TextBox { Width = 200, Watermark = "e.g., Amenities" };
-            _addFeatureButton = new Button { Content = "Add Feature", Margin = new Thickness(10, 0, 0, 0) };
-            _addFeatureButton.Click += AddFeature_Click;
+            var newFeatureNameBox = new TextBox 
+            { 
+                Width = 250, 
+                Watermark = "e.g., Amenities",
+                Margin = new Thickness(5)
+            };
+            newFeatureNameBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("NewFeatureName") { Mode = Avalonia.Data.BindingMode.TwoWay });
+
+            var addFeatureButton = new Button 
+            { 
+                Content = "➕ Add Feature", 
+                Margin = new Thickness(10, 0, 0, 0),
+                Padding = new Thickness(15, 8)
+            };
+            addFeatureButton.Bind(Button.CommandProperty, new Avalonia.Data.Binding("AddFeatureCommand"));
+            addFeatureButton.Bind(Button.IsEnabledProperty, new Avalonia.Data.Binding("!IsProcessing"));
 
             var featureSection = new Border
             {
-                BorderBrush = Brushes.LightGray,
+                BorderBrush = cardBorder,
                 BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
                 Margin = new Thickness(10),
-                Padding = new Thickness(10),
+                Padding = new Thickness(20),
+                Background = cardBackground,
                 Child = new StackPanel
                 {
+                    Spacing = 15,
                     Children =
                     {
-                        new TextBlock { Text = "Add New Feature", FontWeight = FontWeight.Bold },
+                        new TextBlock 
+                        { 
+                            Text = "Add New Feature", 
+                            FontWeight = FontWeight.Bold,
+                            FontSize = 16,
+                            Foreground = textColor
+                        },
                         new StackPanel
                         {
                             Orientation = Orientation.Horizontal,
-                            Margin = new Thickness(0, 10, 0, 0),
                             Children =
                             {
-                                new TextBlock { Text = "Feature Name:", Width = 120 },
-                                _newFeatureNameBox,
-                                _addFeatureButton
+                                new TextBlock 
+                                { 
+                                    Text = "Feature Name:", 
+                                    Width = 120,
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                    Foreground = textColor
+                                },
+                                newFeatureNameBox,
+                                addFeatureButton
                             }
                         }
                     }
                 }
             };
 
-            _seedFeatureComboBox = new ComboBox { Width = 200 };
-            _newSeedPhraseBox = new TextBox { Width = 200, Watermark = "e.g., excellent wifi" };
-            _seedWeightComboBox = new ComboBox { Width = 200, SelectedIndex = 0 };
-            _seedWeightComboBox.Items.Add("+1 (Positive)");
-            _seedWeightComboBox.Items.Add("-1 (Negative)");
+            var seedFeatureComboBox = new ComboBox { Width = 250, Margin = new Thickness(5) };
+            seedFeatureComboBox.Bind(ComboBox.ItemsSourceProperty, new Avalonia.Data.Binding("Features"));
+            seedFeatureComboBox.Bind(ComboBox.SelectedItemProperty, new Avalonia.Data.Binding("SelectedFeature") { Mode = Avalonia.Data.BindingMode.TwoWay });
 
-            _addSeedButton = new Button { Content = "Add Seed Word", Margin = new Thickness(0, 10, 0, 0) };
-            _addSeedButton.Click += AddSeed_Click;
+            var newSeedPhraseBox = new TextBox { Width = 250, Watermark = "e.g., excellent wifi", Margin = new Thickness(5) };
+            newSeedPhraseBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("NewSeedPhrase") { Mode = Avalonia.Data.BindingMode.TwoWay });
+
+            var seedWeightComboBox = new ComboBox { Width = 250, Margin = new Thickness(5) };
+            seedWeightComboBox.Bind(ComboBox.ItemsSourceProperty, new Avalonia.Data.Binding("WeightOptions"));
+            seedWeightComboBox.Bind(ComboBox.SelectedIndexProperty, new Avalonia.Data.Binding("SelectedWeightIndex") { Mode = Avalonia.Data.BindingMode.TwoWay });
+
+            var addSeedButton = new Button 
+            { 
+                Content = "➕ Add Seed Word",
+                Padding = new Thickness(15, 8),
+                Margin = new Thickness(0, 15, 0, 0)
+            };
+            addSeedButton.Bind(Button.CommandProperty, new Avalonia.Data.Binding("AddSeedWordCommand"));
+            addSeedButton.Bind(Button.IsEnabledProperty, new Avalonia.Data.Binding("!IsProcessing"));
 
             var seedSection = new Border
             {
-                BorderBrush = Brushes.LightGray,
+                BorderBrush = cardBorder,
                 BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
                 Margin = new Thickness(10),
-                Padding = new Thickness(10),
+                Padding = new Thickness(20),
+                Background = cardBackground,
                 Child = new StackPanel
                 {
+                    Spacing = 12,
                     Children =
                     {
-                        new TextBlock { Text = "Add New Seed Word", FontWeight = FontWeight.Bold },
+                        new TextBlock 
+                        { 
+                            Text = "Add New Seed Word", 
+                            FontWeight = FontWeight.Bold,
+                            FontSize = 16,
+                            Foreground = textColor
+                        },
                         new StackPanel
                         {
                             Orientation = Orientation.Horizontal,
-                            Margin = new Thickness(0, 10, 0, 5),
                             Children =
                             {
-                                new TextBlock { Text = "Feature:", Width = 120 },
-                                _seedFeatureComboBox
+                                new TextBlock 
+                                { 
+                                    Text = "Feature:", 
+                                    Width = 120,
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                    Foreground = textColor
+                                },
+                                seedFeatureComboBox
                             }
                         },
                         new StackPanel
                         {
                             Orientation = Orientation.Horizontal,
-                            Margin = new Thickness(0, 5, 0, 5),
                             Children =
                             {
-                                new TextBlock { Text = "Seed Phrase:", Width = 120 },
-                                _newSeedPhraseBox
+                                new TextBlock 
+                                { 
+                                    Text = "Seed Phrase:", 
+                                    Width = 120,
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                    Foreground = textColor
+                                },
+                                newSeedPhraseBox
                             }
                         },
                         new StackPanel
                         {
                             Orientation = Orientation.Horizontal,
-                            Margin = new Thickness(0, 5, 0, 5),
                             Children =
                             {
-                                new TextBlock { Text = "Weight:", Width = 120 },
-                                _seedWeightComboBox
+                                new TextBlock 
+                                { 
+                                    Text = "Weight:", 
+                                    Width = 120,
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                    Foreground = textColor
+                                },
+                                seedWeightComboBox
                             }
                         },
-                        _addSeedButton
+                        addSeedButton
                     }
                 }
             };
@@ -135,95 +218,13 @@ namespace HotelRatingViewer.Views.Controls
             {
                 Content = new StackPanel
                 {
-                    Children = { adminLabel, warningText, featureSection, seedSection }
-                }
+                    Background = darkBackground,
+                    Children = { adminLabel, warningBanner, featureSection, seedSection }
+                },
+                Background = darkBackground
             };
 
             Content = scrollViewer;
-        }
-
-        private async void LoadFeatures()
-        {
-            await Task.Run(() =>
-            {
-                var features = _dbService.GetActiveFeatures();
-
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    _seedFeatureComboBox.Items.Clear();
-                    foreach (var feature in features)
-                    {
-                        _seedFeatureComboBox.Items.Add(feature);
-                    }
-                });
-            });
-        }
-
-        private async void AddFeature_Click(object? sender, RoutedEventArgs e)
-        {
-            var featureName = _newFeatureNameBox.Text?.Trim();
-
-            if (string.IsNullOrEmpty(featureName))
-            {
-                _updateStatus("Please enter a feature name", "Orange");
-                return;
-            }
-
-            await Task.Run(() =>
-            {
-                var success = _dbService.AddFeature(featureName);
-
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    if (success)
-                    {
-                        _updateStatus($"✓ Feature '{featureName}' added successfully", "Green");
-                        _newFeatureNameBox.Text = "";
-                        LoadFeatures();
-                    }
-                    else
-                    {
-                        _updateStatus("Error adding feature", "Red");
-                    }
-                });
-            });
-        }
-
-        private async void AddSeed_Click(object? sender, RoutedEventArgs e)
-        {
-            if (_seedFeatureComboBox.SelectedItem == null)
-            {
-                _updateStatus("Please select a feature", "Orange");
-                return;
-            }
-
-            var feature = _seedFeatureComboBox.SelectedItem.ToString();
-            var phrase = _newSeedPhraseBox.Text?.Trim();
-            var weight = _seedWeightComboBox.SelectedIndex == 0 ? 1 : -1;
-
-            if (string.IsNullOrEmpty(phrase) || string.IsNullOrEmpty(feature))
-            {
-                _updateStatus("Please enter a seed phrase", "Orange");
-                return;
-            }
-
-            await Task.Run(() =>
-            {
-                var success = _dbService.AddSeedWord(feature, phrase, weight);
-
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    if (success)
-                    {
-                        _updateStatus($"✓ Seed word '{phrase}' added to {feature}", "Green");
-                        _newSeedPhraseBox.Text = "";
-                    }
-                    else
-                    {
-                        _updateStatus("Error adding seed word", "Red");
-                    }
-                });
-            });
         }
     }
 }
