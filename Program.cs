@@ -1,5 +1,6 @@
 using System;
 using Avalonia;
+using Serilog;
 
 namespace HotelRatingViewer
 {
@@ -8,7 +9,18 @@ namespace HotelRatingViewer
         [STAThread]
         public static void Main(string[] args)
         {
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            try
+            {
+                BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Application terminated unexpectedly");
+            }
+            finally
+            {
+                Log.CloseAndFlush();
+            }
         }
         
         public static AppBuilder BuildAvaloniaApp()
