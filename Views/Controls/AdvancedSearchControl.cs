@@ -1,222 +1,251 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Interactivity;
+using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
-using HotelRatingViewer.Services;
+using HotelRatingViewer.Helpers;
+using HotelRatingViewer.ViewModels;
 
 namespace HotelRatingViewer.Views.Controls
 {
     public class AdvancedSearchControl : UserControl
     {
-        private readonly DatabaseService _dbService;
-        private readonly Action<string, string> _updateStatus;
+        private readonly AdvancedSearchViewModel _viewModel;
 
-        private ComboBox _advCityComboBox = null!;
-        private ComboBox _overallRatingComboBox = null!;
-        private ComboBox _cleanlinessComboBox = null!;
-        private ComboBox _serviceComboBox = null!;
-        private ComboBox _locationComboBox = null!;
-        private ComboBox _comfortComboBox = null!;
-        private ComboBox _priceComboBox = null!;
-        private Button _advSearchButton = null!;
-        private ListBox _advResultsListBox = null!;
-
-        public AdvancedSearchControl(DatabaseService dbService, Action<string, string> updateStatus)
+        public AdvancedSearchControl(AdvancedSearchViewModel viewModel)
         {
-            _dbService = dbService;
-            _updateStatus = updateStatus;
+            _viewModel = viewModel;
+            DataContext = _viewModel;
             BuildUI();
-            LoadCities();
         }
 
         private void BuildUI()
         {
+            // Dark mode colors
+            var darkBackground = new SolidColorBrush(Color.Parse("#1E1E1E"));
+            var cardBackground = new SolidColorBrush(Color.Parse("#2D2D30"));
+            var cardBorder = new SolidColorBrush(Color.Parse("#3F3F46"));
+            var textColor = new SolidColorBrush(Color.Parse("#E0E0E0"));
+            var subtleTextColor = new SolidColorBrush(Color.Parse("#A0A0A0"));
+
             var advLabel = new TextBlock
             {
-                Text = "Advanced Search",
-                FontSize = 16,
+                Text = "🔬 Advanced Search",
+                FontSize = 20,
                 FontWeight = FontWeight.Bold,
-                Margin = new Thickness(10)
+                Margin = new Thickness(10, 10, 10, 20),
+                Foreground = textColor
             };
 
-            var cityLabel = new TextBlock
+            // City selection
+            var cityCard = new Border
             {
-                Text = "City:",
-                Width = 100,
-                Margin = new Thickness(5)
-            };
-
-            _advCityComboBox = new ComboBox
-            {
-                Width = 200,
-                Margin = new Thickness(5)
-            };
-
-            var cityPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
+                BorderBrush = cardBorder,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(20),
                 Margin = new Thickness(10),
-                Children = { cityLabel, _advCityComboBox }
+                Background = cardBackground,
+                Child = new StackPanel
+                {
+                    Children =
+                    {
+                        new TextBlock 
+                        { 
+                            Text = "Location", 
+                            FontWeight = FontWeight.Bold, 
+                            FontSize = 15,
+                            Margin = new Thickness(0, 0, 0, 12),
+                            Foreground = textColor
+                        },
+                        new StackPanel
+                        {
+                            Orientation = Orientation.Horizontal,
+                            Children =
+                            {
+                                new TextBlock 
+                                { 
+                                    Text = "City:", 
+                                    Width = 100, 
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                    Foreground = textColor
+                                },
+                                CreateComboBox("Cities", "SelectedCity", 250)
+                            }
+                        }
+                    }
+                }
             };
 
-            var criteriaPanel = new StackPanel
+            // Rating criteria card
+            var criteriaCard = new Border
             {
-                Margin = new Thickness(20, 10, 10, 10),
-                Spacing = 10
+                BorderBrush = cardBorder,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(20),
+                Margin = new Thickness(10),
+                Background = cardBackground,
+                Child = new StackPanel
+                {
+                    Spacing = 12,
+                    Children =
+                    {
+                        new TextBlock 
+                        { 
+                            Text = "Rating Criteria", 
+                            FontWeight = FontWeight.Bold, 
+                            FontSize = 15,
+                            Margin = new Thickness(0, 0, 0, 12),
+                            Foreground = textColor
+                        },
+                        CreateRatingRow("Overall Rating:", "SelectedOverallRating", textColor),
+                        CreateRatingRow("Cleanliness:", "SelectedCleanliness", textColor),
+                        CreateRatingRow("Service:", "SelectedService", textColor),
+                        CreateRatingRow("Location:", "SelectedLocation", textColor),
+                        CreateRatingRow("Comfort:", "SelectedComfort", textColor),
+                        CreateRatingRow("Price:", "SelectedPrice", textColor)
+                    }
+                }
             };
 
-            string[] ratingOptions = { "Any", ">1.0", ">2.0", ">3.0", ">3.5", ">4.0", ">4.5" };
-
-            criteriaPanel.Children.Add(CreateRatingComboBox("Overall Rating:", ratingOptions, out _overallRatingComboBox));
-            criteriaPanel.Children.Add(CreateRatingComboBox("Cleanliness:", ratingOptions, out _cleanlinessComboBox));
-            criteriaPanel.Children.Add(CreateRatingComboBox("Service:", ratingOptions, out _serviceComboBox));
-            criteriaPanel.Children.Add(CreateRatingComboBox("Location:", ratingOptions, out _locationComboBox));
-            criteriaPanel.Children.Add(CreateRatingComboBox("Comfort:", ratingOptions, out _comfortComboBox));
-            criteriaPanel.Children.Add(CreateRatingComboBox("Price:", ratingOptions, out _priceComboBox));
-
-            _advSearchButton = new Button
+            var searchButton = new Button
             {
-                Content = "Search",
-                Width = 150,
-                Margin = new Thickness(20, 10, 10, 10)
+                Content = "🔍 Search Hotels",
+                Width = 200,
+                Height = 42,
+                Margin = new Thickness(10, 15, 10, 10),
+                FontSize = 14,
+                FontWeight = FontWeight.Bold
             };
-            _advSearchButton.Click += AdvSearchButton_Click;
+            searchButton.Bind(Button.CommandProperty, new Avalonia.Data.Binding("SearchCommand"));
+            searchButton.Bind(Button.IsEnabledProperty, new Avalonia.Data.Binding("!IsSearching"));
 
-            _advResultsListBox = new ListBox
+            // Results header
+            var resultsHeader = new TextBlock
             {
-                Margin = new Thickness(20, 10, 10, 10)
+                Text = "Search Results",
+                FontWeight = FontWeight.Bold,
+                FontSize = 17,
+                Margin = new Thickness(10, 20, 10, 10),
+                Foreground = textColor
             };
+
+            var resultsListBox = new ListBox
+            {
+                Margin = new Thickness(10),
+                Background = darkBackground,
+                ItemTemplate = new FuncDataTemplate<HotelSearchResult>((item, _) =>
+                    new Border
+                    {
+                        Padding = new Thickness(18),
+                        Margin = new Thickness(0, 4),
+                        Background = cardBackground,
+                        BorderBrush = cardBorder,
+                        BorderThickness = new Thickness(1),
+                        CornerRadius = new CornerRadius(8),
+                        Child = new Grid
+                        {
+                            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                            Children =
+                            {
+                                new StackPanel
+                                {
+                                    Children =
+                                    {
+                                        new TextBlock 
+                                        { 
+                                            Text = item.HotelName, 
+                                            FontWeight = FontWeight.Bold,
+                                            FontSize = 16,
+                                            Foreground = textColor
+                                        },
+                                        new TextBlock 
+                                        { 
+                                            Text = $"📍 {item.City}, {item.Country}",
+                                            FontSize = 13,
+                                            Foreground = subtleTextColor,
+                                            Margin = new Thickness(0, 6, 0, 0)
+                                        },
+                                        new TextBlock
+                                        {
+                                            Text = item.Stars,
+                                            FontSize = 15,
+                                            Margin = new Thickness(0, 6, 0, 0)
+                                        }
+                                    }
+                                },
+                                new Border
+                                {
+                                    Background = (IBrush)RatingColorHelper.GetRatingColor(item.Rating),
+                                    CornerRadius = new CornerRadius(20),
+                                    Padding = new Thickness(16, 10),
+                                    [Grid.ColumnProperty] = 1,
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                    Child = new TextBlock
+                                    {
+                                        Text = item.Rating.ToString("F2"),
+                                        Foreground = Brushes.White,
+                                        FontWeight = FontWeight.Bold,
+                                        FontSize = 17
+                                    }
+                                }
+                            }
+                        }
+                    })
+            };
+            resultsListBox.Bind(ListBox.ItemsSourceProperty, new Avalonia.Data.Binding("Results"));
 
             var scrollViewer = new ScrollViewer
             {
                 Content = new StackPanel
                 {
+                    Background = darkBackground,
                     Children =
                     {
                         advLabel,
-                        cityPanel,
-                        criteriaPanel,
-                        _advSearchButton,
-                        new TextBlock
-                        {
-                            Text = "Results:",
-                            FontWeight = FontWeight.Bold,
-                            Margin = new Thickness(20, 10, 10, 5)
-                        },
-                        _advResultsListBox
+                        cityCard,
+                        criteriaCard,
+                        searchButton,
+                        resultsHeader,
+                        resultsListBox
                     }
-                }
+                },
+                Background = darkBackground
             };
 
             Content = scrollViewer;
         }
 
-        private StackPanel CreateRatingComboBox(string label, string[] options, out ComboBox comboBox)
+        private ComboBox CreateComboBox(string itemsSource, string selectedItemBinding, int width)
         {
-            comboBox = new ComboBox
-            {
-                Width = 150,
-                Margin = new Thickness(5)
-            };
+            var comboBox = new ComboBox { Width = width };
+            comboBox.Bind(ComboBox.ItemsSourceProperty, new Avalonia.Data.Binding(itemsSource));
+            comboBox.Bind(ComboBox.SelectedItemProperty, new Avalonia.Data.Binding(selectedItemBinding) { Mode = Avalonia.Data.BindingMode.TwoWay });
+            return comboBox;
+        }
 
-            foreach (var opt in options)
-            {
-                comboBox.Items.Add(opt);
-            }
-            comboBox.SelectedIndex = 0;
+        private StackPanel CreateRatingRow(string label, string bindingPath, SolidColorBrush textColor)
+        {
+            var comboBox = new ComboBox { Width = 150 };
+            comboBox.Bind(ComboBox.ItemsSourceProperty, new Avalonia.Data.Binding("RatingOptions"));
+            comboBox.Bind(ComboBox.SelectedItemProperty, new Avalonia.Data.Binding(bindingPath) { Mode = Avalonia.Data.BindingMode.TwoWay });
 
-            var panel = new StackPanel
+            return new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 Children =
                 {
-                    new TextBlock { Text = label, Width = 120, Margin = new Thickness(5) },
+                    new TextBlock 
+                    { 
+                        Text = label, 
+                        Width = 150, 
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Foreground = textColor
+                    },
                     comboBox
                 }
             };
-
-            return panel;
-        }
-
-        private async void LoadCities()
-        {
-            await Task.Run(() =>
-            {
-                var cities = _dbService.GetCities();
-
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    _advCityComboBox.Items.Clear();
-                    foreach (var city in cities)
-                    {
-                        _advCityComboBox.Items.Add(city);
-                    }
-                });
-            });
-        }
-
-        private async void AdvSearchButton_Click(object? sender, RoutedEventArgs e)
-        {
-            if (_advCityComboBox.SelectedItem == null)
-            {
-                _updateStatus("Please select a city", "Orange");
-                return;
-            }
-
-            var city = _advCityComboBox.SelectedItem.ToString();
-            if (string.IsNullOrEmpty(city)) return;
-
-            var criteria = new Dictionary<string, double?>
-            {
-                ["overall"] = ParseRatingCriteria(_overallRatingComboBox.SelectedItem?.ToString()),
-                ["cleanliness"] = ParseRatingCriteria(_cleanlinessComboBox.SelectedItem?.ToString()),
-                ["service"] = ParseRatingCriteria(_serviceComboBox.SelectedItem?.ToString()),
-                ["location"] = ParseRatingCriteria(_locationComboBox.SelectedItem?.ToString()),
-                ["comfort"] = ParseRatingCriteria(_comfortComboBox.SelectedItem?.ToString()),
-                ["price"] = ParseRatingCriteria(_priceComboBox.SelectedItem?.ToString())
-            };
-
-            _updateStatus("Searching with filters...", "Blue");
-
-            await Task.Run(() =>
-            {
-                var results = _dbService.AdvancedSearch(city, criteria);
-
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    _advResultsListBox.Items.Clear();
-
-                    if (results.Count > 0)
-                    {
-                        foreach (var hotel in results)
-                        {
-                            _advResultsListBox.Items.Add($"{hotel.HotelName} (Rating: {hotel.OverallRating:F2})");
-                        }
-                        _updateStatus($"Found {results.Count} matching hotels", "Green");
-                    }
-                    else
-                    {
-                        _advResultsListBox.Items.Add("No hotels match the criteria");
-                        _updateStatus("No matches found", "Orange");
-                    }
-                });
-            });
-        }
-
-        private double? ParseRatingCriteria(string? criteria)
-        {
-            if (string.IsNullOrEmpty(criteria) || criteria == "Any")
-                return null;
-
-            var numStr = criteria.Replace(">", "").Trim();
-            if (double.TryParse(numStr, out double val))
-                return val;
-
-            return null;
         }
     }
 }
