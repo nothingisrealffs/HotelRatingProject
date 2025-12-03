@@ -24,6 +24,7 @@ namespace HotelRatingViewer
         {
             Styles.Add(new FluentTheme());
 
+            // Modern Styles
             var buttonStyle = new Style(x => x.OfType<Button>());
             buttonStyle.Setters.Add(new Setter(Button.CornerRadiusProperty, new CornerRadius(8)));
             buttonStyle.Setters.Add(new Setter(Button.PaddingProperty, new Thickness(15, 8)));
@@ -62,6 +63,9 @@ namespace HotelRatingViewer
             services.AddTransient<AdvancedSearchViewModel>();
             services.AddTransient<AdminViewModel>();
             
+            // Windows
+            // We don't strictly need to register SplashWindow if we create it manually, but it helps if we want DI injection later
+            // For now we will resolve LoginViewModel manually
         }
 
         public override void OnFrameworkInitializationCompleted()

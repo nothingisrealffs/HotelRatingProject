@@ -135,8 +135,9 @@ namespace HotelRatingViewer.Views.Controls
             {
                 Margin = new Thickness(10),
                 Background = darkBackground,
+                // FIXED: Added 'item is null ? new Panel() :' check here
                 ItemTemplate = new FuncDataTemplate<HotelSearchResult>((item, _) =>
-                    new Border
+                    item is null ? new Panel() : new Border 
                     {
                         Padding = new Thickness(18),
                         Margin = new Thickness(0, 4),

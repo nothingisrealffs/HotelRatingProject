@@ -1,3 +1,5 @@
+// File: ./Models/HotelListItem.cs
+
 namespace HotelRatingViewer.Models
 {
     public class HotelListItem

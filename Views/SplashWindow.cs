@@ -97,6 +97,7 @@ namespace HotelRatingViewer.Views
                 Margin = new Thickness(0, 5, 0, 20)
             };
 
+            // 3. Progress Section
             _progressBar = new ProgressBar
             {
                 Width = 500,
@@ -118,6 +119,7 @@ namespace HotelRatingViewer.Views
                 Margin = new Thickness(0, 10, 0, 0)
             };
 
+            // 4. Login Form
             _loginPanel = new StackPanel
             {
                 Spacing = 15,
@@ -233,6 +235,8 @@ namespace HotelRatingViewer.Views
                 _viewModel.SetConfigValues(config);
             }
         }
+
+        // --- ANIMATION LOGIC ---
 
         private async void AnimateToPrompt()
         {

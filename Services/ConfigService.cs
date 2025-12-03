@@ -6,7 +6,9 @@ namespace HotelRatingViewer.Services
 {
     public static class ConfigService
     {
+        // Changed from .txt to .inf as requested
         private const string ConfigFileName = "db_config.inf";
+
         public static DatabaseConfig? LoadConfig()
         {
             try
@@ -44,6 +46,7 @@ namespace HotelRatingViewer.Services
                 return null;
             }
         }
+
         public static void CreateSampleConfig()
         {
             try
@@ -58,7 +61,7 @@ namespace HotelRatingViewer.Services
                         Server=localhost
                         Port=1521
                         Service=XE
-                        User=placeholder
+                        User=hotel_admin
                         Password=secret
                         """;
                     
@@ -67,6 +70,7 @@ namespace HotelRatingViewer.Services
             }
             catch
             {
+                // Ignore errors creating sample config
             }
         }
     }

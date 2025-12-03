@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
-using HotelRatingViewer.Models; 
+using HotelRatingViewer.Models;
 using HotelRatingViewer.Services;
 
 namespace HotelRatingViewer.ViewModels
@@ -29,8 +29,13 @@ namespace HotelRatingViewer.ViewModels
         [ObservableProperty]
         private bool _isSearching = false;
 
+        // -- NEW PROPERTIES FOR REVIEW POPUP --
+        [ObservableProperty]
+        private bool _isShowingReviews = false;
+
         public ObservableCollection<string> Cities { get; } = new();
         public ObservableCollection<HotelListItem> Hotels { get; } = new();
+        public ObservableCollection<HotelReview> HotelReviews { get; } = new();
 
         public event EventHandler<(string message, string color)>? StatusChanged;
 
@@ -73,6 +78,9 @@ namespace HotelRatingViewer.ViewModels
 
             try
             {
+                // Reset reviews when NEW search happens
+                CloseReviews();
+
                 var rating = await _databaseService.GetHotelRatingAsync(HotelSearchText);
 
                 if (rating != null)
@@ -97,6 +105,45 @@ namespace HotelRatingViewer.ViewModels
             }
         }
 
+        // -- NEW COMMAND TO LOAD REVIEWS --
+        [RelayCommand]
+        private async Task ShowReviewsAsync()
+        {
+            if (CurrentRating == null) return;
+
+            IsSearching = true;
+            UpdateStatus($"Loading reviews for {CurrentRating.HotelName}...", "Blue");
+
+            try
+            {
+                HotelReviews.Clear();
+                var reviews = await _databaseService.GetHotelReviewsAsync(CurrentRating.HotelName);
+                
+                foreach(var rev in reviews)
+                {
+                    HotelReviews.Add(rev);
+                }
+
+                IsShowingReviews = true;
+                UpdateStatus($"Displaying {reviews.Count} reviews", "Green");
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "Error loading reviews");
+                UpdateStatus("Error loading reviews", "Red");
+            }
+            finally
+            {
+                IsSearching = false;
+            }
+        }
+
+        [RelayCommand]
+        private void CloseReviews()
+        {
+            IsShowingReviews = false;
+        }
+
         partial void OnSelectedCityChanged(string? value)
         {
             if (!string.IsNullOrEmpty(value))
@@ -105,7 +152,6 @@ namespace HotelRatingViewer.ViewModels
             }
         }
 
-        // *** METHOD HAS BEEN COMPLETELY REPLACED ***
         private async Task LoadHotelsAsync(string city)
         {
             try
@@ -145,6 +191,7 @@ namespace HotelRatingViewer.ViewModels
         {
             if (!string.IsNullOrEmpty(value))
             {
+                CloseReviews(); // Reset review popup if they change selection while open
                 _ = LoadHotelRatingAsync(value);
             }
         }
@@ -172,6 +219,4 @@ namespace HotelRatingViewer.ViewModels
             StatusChanged?.Invoke(this, (message, color));
         }
     }
-
-    // The HotelListItem class has been removed from this file and moved to Models/HotelListItem.cs
 }
