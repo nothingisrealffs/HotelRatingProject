@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  seed-builder:
+    build: .
+    volumes:
+      - ./data:/app/data:ro
+      - ./output/:/app/output
+    command: >
+      python seed_builder.py
+      --data-dir data
+      --reviews-out /dev/null
+      --seeds-out /app/output/seeds.csv
